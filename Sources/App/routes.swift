@@ -10,17 +10,40 @@ func routes(_ app: Application) throws {
         return "Hello, world!"
     }
     
-    app.grouped(UserRoleMiddleware(roles: [.admin])).get(":organizationID/admin") { req -> String in
+    app.grouped(UserRoleMiddleware(through: .parameter("organizationID"), roles: [.admin])).get(":organizationID/admin") { req -> String in
         return "You have access as an admin!"
+    }
+}
+
+enum OrganizationIDObtainer {
+    case parameter(String)
+    
+    func value(for req: Request) -> UUID? {
+        switch self {
+        case .parameter(let parameter):
+            guard let parameterValue = req.parameters.get(parameter) else {
+                return nil
+            }
+            
+            return UUID(uuidString: parameterValue)
+        }
     }
 }
 
 struct UserRoleMiddleware: Middleware {
     let roles: [Role]
+    let obtainer: OrganizationIDObtainer
+    
+    init(through obtainer: OrganizationIDObtainer, roles: [Role]) {
+        self.obtainer = obtainer
+        self.roles = roles
+    }
     
     func respond(to request: Request, chainingTo next: Responder) -> EventLoopFuture<Response> {
         // A better method would being able to supply how to get the org ID through the middleware
-        let orgID = UUID(uuidString: request.parameters.get("organizationID")!)!
+        guard let orgID = obtainer.value(for: request) else {
+            return request.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Organization ID not found..."))
+        }
         
         // in real life app, get the user via. authentication...
         let user = User()
