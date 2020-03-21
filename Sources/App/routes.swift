@@ -40,7 +40,6 @@ struct UserRoleMiddleware: Middleware {
     }
     
     func respond(to request: Request, chainingTo next: Responder) -> EventLoopFuture<Response> {
-        // A better method would being able to supply how to get the org ID through the middleware
         guard let orgID = obtainer.value(for: request) else {
             return request.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Organization ID not found..."))
         }
